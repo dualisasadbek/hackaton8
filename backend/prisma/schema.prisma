@@ -1,0 +1,155 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum Role {
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum SosCategory {
+  MEDICAL
+  FIRE
+  ACCIDENT
+  CRIME
+  OTHER
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SosStatus {
+  NEW
+  ANALYZING
+  PROCESSING
+  RESOLVED
+  AUTO_DISPATCHED
+  CANCELLED
+}
+
+enum AiAction {
+  SEVERITY_CHECK
+  AUTO_DISPATCH
+  IMAGE_ANALYSIS
+  SUMMARY
+}
+
+// ============ MODELS ============
+
+model User {
+  id            String        @id @default(uuid())
+  fullName      String
+  phone         String        @unique
+  email         String        @unique
+  passwordHash  String
+  avatarUrl     String?
+  sosRequests   SosRequest[]
+  sessions      Session[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Admin {
+  id           String        @id @default(uuid())
+  fullName     String
+  email        String        @unique
+  passwordHash String
+  role         Role          @default(ADMIN)
+  avatarUrl    String?
+  sessions     Session[]
+  assignments  Assignment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model SosRequest {
+  id            String          @id @default(uuid())
+  userId        String
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  latitude      Float
+  longitude     Float
+  address       String?
+  description   String
+  category      SosCategory     @default(OTHER)
+  severity      Severity        @default(MEDIUM)
+  status        SosStatus       @default(NEW)
+  aiScore       Int?
+  aiSummary     String?
+  photos        String[]        @default([])
+  assignments   Assignment[]
+  aiLogs        AiLog[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([status, category])
+  @@index([createdAt])
+}
+
+model Assignment {
+  id            String       @id @default(uuid())
+  sosRequestId  String
+  sosRequest    SosRequest   @relation(fields: [sosRequestId], references: [id], onDelete: Cascade)
+  adminId       String
+  admin         Admin        @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  action        String
+  note          String?
+  dispatchedAt  DateTime     @default(now())
+  createdAt     DateTime     @default(now())
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  name       String
+  email      String
+  phone      String?
+  subject    String
+  text       String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model AiLog {
+  id            String       @id @default(uuid())
+  sosRequestId  String
+  sosRequest    SosRequest   @relation(fields: [sosRequestId], references: [id], onDelete: Cascade)
+  action        AiAction
+  severityScore Int?
+  details       Json?
+  createdAt     DateTime     @default(now())
+
+  @@index([sosRequestId, action])
+}
+
+model Session {
+  id           String    @id @default(uuid())
+  userId       String?
+  adminId      String?
+  user         User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admin        Admin?    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  refreshToken String    @unique
+  userAgent    String?
+  ip           String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+  @@index([adminId])
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+}
